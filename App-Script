@@ -1,0 +1,75 @@
+function onOpen() {
+  // No custom menu is created
+}
+
+function onEdit(e) {
+  if (e && e.range) {
+    var sheet = e.range.getSheet();
+
+    // Check if the sheet is defined
+    if (!sheet) {
+      return;
+    }
+
+    var range = e.range;
+
+    if (isSheetCleared(sheet)) {
+      restoreOriginalContent(sheet);
+      return;
+    }
+
+    var wasEmpty = e.oldValue === undefined || e.oldValue === null || e.oldValue === "";
+
+    if (range.getValue() !== "" && !wasEmpty) {
+      Browser.msgBox("Non-empty cells are read-only. Changes will be reverted.");
+      range.setValue(e.oldValue);
+    }
+
+    if (range.isBlank() || range.getValue() === "") {
+      sheet.getRange(range.getRow(), range.getColumn()).setValue(e.oldValue);
+    }
+
+    // Check if the entire row is being modified
+    var editedRow = range.getRow();
+    var editedColumn = range.getColumn();
+
+    // Prevent deletion of entire rows or columns
+    if (e.range.getNumRows() === sheet.getMaxRows()) {
+      Browser.msgBox("You are not allowed to delete entire rows.");
+      restoreOriginalContent(sheet, editedRow);
+    }
+
+    if (e.range.getNumColumns() === sheet.getMaxColumns()) {
+      Browser.msgBox("You are not allowed to delete entire columns.");
+      restoreOriginalContent(sheet, null, editedColumn);
+    }
+  }
+}
+
+function isSheetCleared(sheet) {
+  return sheet && sheet.getDataRange().getValues().flat().every(cell => cell === "");
+}
+
+function restoreOriginalContent(sheet, editedRow, editedColumn) {
+  // Check if the sheet is defined
+  if (!sheet) {
+    return;
+  }
+
+  var originalData = sheet.getDataRange().getValues();
+  sheet.clearContents(); // Clear all existing content
+
+  if (originalData.length > 0 && originalData[0].length > 0) {
+    sheet.getRange(1, 1, originalData.length, originalData[0].length).setValues(originalData);
+  }
+
+  // If only a single row was edited, restore its original values
+  if (editedRow) {
+    sheet.getRange(editedRow, 1, 1, originalData[0].length).setValues([originalData[editedRow - 1]]);
+  }
+
+  // If only a single column was edited, restore its original values
+  if (editedColumn) {
+    sheet.getRange(1, editedColumn, originalData.length, 1).setValues(originalData.map(row => [row[editedColumn - 1]]));
+  }
+}
